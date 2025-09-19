@@ -7,7 +7,7 @@ files = files(~[files.isdir]);  % eliminar carpetas
 fileSizesMB = [files.bytes] / 1e6;
 
 % Filtrar archivos mayores a 100 MB
-largeFiles = files(fileSizesMB > 60);
+largeFiles = files(fileSizesMB > 100);
 
 % Crear o abrir .gitignore
 fid = fopen('big_files.txt', 'w');
