@@ -1,5 +1,5 @@
 % function sim_case(info)
-
+    clear sys_data
     caseName=info.T_Case.main_name{:};
     fanals = 2; 
     shared_power = 0;
