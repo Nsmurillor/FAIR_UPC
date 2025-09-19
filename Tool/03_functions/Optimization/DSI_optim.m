@@ -1,0 +1,325 @@
+function [H2_norm] = DSI_optim(var,info)
+
+    setup_globals;
+
+    nombres = fieldnames(info.Data_preload);
+    for k = 1:numel(nombres)
+        nombre = nombres{k};
+        if ~strcmp(nombre,'info')
+            valor = info.Data_preload.(nombre);
+            eval([nombre ' = valor;']);  % crea variable local
+        end
+    end
+
+    switch info.version
+        case 1
+            net_var=4;
+        case 2
+            net_var=4;
+    end
+    
+    switch info.type
+        case 'Grid'
+            var_grid = var([1:net_var]);
+            bool_reload_vsc=false;
+        case 'Electric'
+            var_grid = var([1:net_var]);
+            var_vsc = zeros(1,18);
+            var_vsc([1:6]) =var([net_var+1:net_var+6]);
+            bool_reload_vsc=true;
+        case 'All'
+            var_grid = var([1:net_var]);
+            var_vsc = zeros(1,18);
+            var_vsc([1:15]) =var([net_var+1:15+net_var]);
+            bool_reload_vsc=true;
+    end
+    
+ 
+    if bool_reload_vsc
+
+        T_VSC=generate_parameters_VSC_opt_new(T_VSC_base,T_global,T_data_VSC,var_vsc);
+    end 
+    penalty=0;
+    switch info.version
+        case 1
+
+            alpha_ii1=var_grid(1);
+            alpha_ii2=var_grid(2);
+        
+            S_load=alpha_ii1*real(info.network.S_iny_base)+alpha_ii2*imag(info.network.S_iny_base)*1i;
+            S_losses=info.network.S_iny_base-S_load;
+        
+            beta_jj1=var_grid(3);
+            beta_jj2=var_grid(4);
+        
+            S_L1=beta_jj1*real(S_load)+beta_jj2*imag(S_load)*1i;
+            S_L2=(1-beta_jj1)*real(S_load)+(1-beta_jj2)*imag(S_load)*1i;
+            
+            S_12=info.network.S_net_base-S_L1;
+            
+            I_12=conj(S_12/info.network.V_2_base);
+            Z_eq=S_losses/abs(I_12)^2;
+        
+            T_load.P(2)=real(S_L1);
+            T_load.Q(2)=imag(S_L1);
+            T_load.P(3)=real(S_L2);
+            T_load.Q(3)=imag(S_L2);
+        
+            T_NET.R(2)=real(Z_eq);
+            T_NET.X(2)=imag(Z_eq);
+
+            
+
+        case 2
+
+            % alpha_p=var_grid(1);
+            % alpha_q=var_grid(2);
+            % 
+            % beta_1p=0;            
+            % beta_2p=var_grid(3);
+            % 
+            % beta_1q=0;
+            % beta_2q=var_grid(4);
+            % 
+            % gamma_p=var_grid(5);
+            % gamma_q=var_grid(6);
+            % 
+            % % if (beta_1p+beta_2p)>=1 
+            % %     penalty=penalty+3*1e2*(beta_1p+beta_2p-1)^2;
+            % % end
+            % % 
+            % % if (beta_1q+beta_2q)>=1
+            % %     penalty=penalty+3*1e2*(beta_1q+beta_2q-1)^2;
+            % % end
+            % 
+            % S_load=alpha_p*real(info.network.S_iny_base)+alpha_q*imag(info.network.S_iny_base)*1i;
+            % S_losses=info.network.S_iny_base-S_load;
+            % 
+            % S_L1=beta_1p*real(S_load)+beta_1q*imag(S_load)*1i;
+            % S_L2=beta_2p*real(S_load)+beta_2q*imag(S_load)*1i;
+            % S_L3=(1-beta_1p-beta_2p)*real(S_load)+(1-beta_1q-beta_2q)*imag(S_load)*1i;
+            % 
+            % S_losses_12=gamma_p*real(S_losses)+gamma_q*imag(S_losses)*1i;
+            % S_losses_23=(1-gamma_p)*real(S_losses)+(1-gamma_q)*imag(S_losses)*1i;
+            % 
+            % S_12=info.network.S_net_base-S_L1;          
+            % I_12=conj(S_12/info.network.V_2_base);
+            % 
+            % Z_eq_12=S_losses_12/abs(I_12)^2;
+            % 
+            % V_3_base=-I_12*Z_eq_12+info.network.V_2_base;
+            % 
+            % S_21=V_3_base*conj(-I_12);
+            % S_23=-S_21-S_L2;
+            % 
+            % I_23=conj(S_23/V_3_base);
+            % 
+            % Z_eq_23=S_losses_23/abs(I_23)^2;
+            % 
+            % 
+            % T_load.P(3)=real(S_L2);
+            % T_load.Q(3)=imag(S_L2);
+            % T_load.P(4)=real(S_L3);
+            % T_load.Q(4)=imag(S_L3);
+            % T_load(2,:)=[];
+            % 
+            % T_NET.R(2)=real(Z_eq_12);
+            % T_NET.X(2)=imag(Z_eq_12);
+            % 
+            % T_NET.R(3)=real(Z_eq_23);
+            % T_NET.X(3)=imag(Z_eq_23);
+
+            alpha_p=var_grid(1);
+            alpha_q=var_grid(2);
+            
+            beta_2p=var_grid(3);
+            beta_2q=var_grid(4);
+
+            Z_eq_12=(1-info.network.fact_line)*info.network.R_12+(1-info.network.fact_line)*info.network.X_12*1i;
+            S_12=info.network.S_net_base;
+            I_12=conj(S_12/info.network.V_2_base);
+
+            S_iny_2=info.network.S_iny_base-abs(I_12)^2*Z_eq_12;
+
+            V_3_base=-I_12*Z_eq_12+info.network.V_2_base;
+
+            S_load=alpha_p*real(S_iny_2)+alpha_q*imag(S_iny_2)*1i;
+            S_losses=S_iny_2-S_load;
+
+            S_L2=beta_2p*real(S_load)+beta_2q*imag(S_load)*1i;
+            S_L3=S_load-S_L2;
+
+            S_21=V_3_base*conj(-I_12);
+            S_23=-S_21-S_L2;
+
+            I_23=conj(S_23/V_3_base);
+
+            Z_eq_23=S_losses/abs(I_23)^2;
+
+            T_load.P(2)=0;
+            T_load.Q(2)=0;
+            T_load.P(3)=real(S_L2);
+            T_load.Q(3)=imag(S_L2);
+            T_load.P(4)=real(S_L3);
+            T_load.Q(4)=imag(S_L3);
+
+            T_load(2,:)=[];
+            T_NET.R(2)=real(Z_eq_12);
+            T_NET.X(2)=imag(Z_eq_12);
+
+            T_NET.R(3)=real(Z_eq_23);
+            T_NET.X(3)=imag(Z_eq_23);
+
+    end
+    
+    % set_breaker_state('line',1,'close')
+   
+    
+    run PF_results_opt.m;
+
+    run update_OP.m
+            
+    % Compute reference angle (delta_slk)
+    run delta_slack_acdc.m
+
+    % Generate AC & DC NET State-Space Model
+    run generate_NET_with_Qneg.m
+    % Generate generator units State-Space Model
+    run generate_elements.m
+    % close all
+    
+
+
+    input={"NET.vn1q","NET.vn1d"};
+    output={"NET.iq_1_2","NET.id_1_2"};
+            
+    l_block_=l_blocks(:);
+    
+    l_block_([2])=[]; %Load disconection
+
+    System_ii_jj=(connect(l_block_{:},input,output));% 
+
+    diff_ii_jj=info.System.System_ref-System_ii_jj;
+
+    if info.plot.bool & strcmp(info.optmode,'fmin')
+        cla(info.plot.ax_plot11)
+        % t_now=datetime('now')-info.plot.time_init;
+        % scatter(info.plot.ax_plot2,repmat(t_now,4,1)', var_grid, 50,info.plot.colors.grid, 'filled')
+    end
+    
+    H2_norm=penalty;
+    
+
+    H_lim=[];
+    H_line=[];
+    H_point=[];
+
+    if info.lim.bool
+        
+        for kk=1:info.lim.number
+            DSI_kk=sigma(diff_ii_jj,[info.lim.w_opt{kk}]);
+            DSI_kk=DSI_kk(1,:);
+            DSI_kk_log=log10(DSI_kk);
+            Diff_DSI_kk=DSI_kk_log-(info.lim.DSI_kron_log{kk}+info.lim.bias(kk));
+            H2_norm_kk=trapz(info.lim.w_opt_log{kk},(Diff_DSI_kk).^2);
+            H2_norm=H2_norm+H2_norm_kk*info.lim.factor(kk);
+
+            H_lim=[H_lim,H2_norm_kk*info.lim.factor(kk)];
+            if info.plot.bool & strcmp(info.optmode,'fmin')                
+                plot(info.plot.ax_plot11,info.lim.w_opt{kk}/(2*pi),DSI_kk,'Color',info.plot.colors.lim(kk,:));
+                plot(info.plot.ax_plot11,info.lim.w_opt{kk}/(2*pi),info.lim.DSI_kron{kk},'Color','k','LineStyle','-');
+                plot(info.plot.ax_plot11,info.lim.w_opt{kk}/(2*pi),info.lim.DSI_kron{kk}*10^(info.lim.bias(kk)),'Color',info.plot.colors.lim(kk,:),'LineStyle','--');
+            end
+        end
+
+    end
+
+    if info.line.bool
+        
+        for kk=1:info.line.number
+            DSI_kk=sigma(diff_ii_jj,[info.line.w_opt{kk}]);
+            DSI_kk=DSI_kk(1,:);
+            DSI_kk_log=log10(DSI_kk);
+            Diff_DSI_kk=DSI_kk_log-(info.line.DSI_line_log{kk});
+            H2_norm_kk=trapz(info.line.w_opt_log{kk},(Diff_DSI_kk).^2);
+            H2_norm=H2_norm+H2_norm_kk*info.line.factor(kk);
+
+            H_line=[H_line,H2_norm_kk*info.line.factor(kk)];
+            if info.plot.bool & strcmp(info.optmode,'fmin')
+
+                plot(info.plot.ax_plot11,info.line.w_opt{kk}/(2*pi),DSI_kk,'Color',info.plot.colors.line(kk,:));
+                plot(info.plot.ax_plot11,info.line.w_opt{kk}/(2*pi),info.line.DSI_kron{kk},'Color','k','LineStyle','-');
+                plot(info.plot.ax_plot11,info.line.w_opt{kk}/(2*pi),info.line.DSI_line{kk},'Color',info.plot.colors.line(kk,:),'LineStyle','--');
+            end
+        end
+
+    end
+
+    if info.point.bool 
+        
+        for kk=1:info.point.number
+            DSI_kk=sigma(diff_ii_jj,[info.point.w_opt(kk)]);
+            DSI_kk=DSI_kk(1,:);
+            DSI_kk_log=log10(DSI_kk);
+            Diff_DSI_kk=DSI_kk_log-(info.point.DSI_kron_log(kk)+info.point.bias(kk));
+            H2_norm_kk=(Diff_DSI_kk).^2;
+            H2_norm=H2_norm+H2_norm_kk*info.point.factor(kk);
+            H_point=[H_point,H2_norm_kk*info.point.factor(kk)];
+
+            if info.plot.bool & strcmp(info.optmode,'fmin')
+
+                plot(info.plot.ax_plot11,([1,1].*info.point.w_opt(kk))/(2*pi), ...
+                    DSI_kk.*[10,1],'Color',info.plot.colors.point(kk,:));
+
+                plot(info.plot.ax_plot11,([1,1]*info.point.w_opt(kk))/(2*pi).*([1,0.8]), ...
+                    DSI_kk.*[1,1.6],'Color',info.plot.colors.point(kk,:));
+
+                plot(info.plot.ax_plot11,([1,1]*info.point.w_opt(kk))/(2*pi).*([1,1.25]), ...
+                    DSI_kk.*[1,1.6],'Color',info.plot.colors.point(kk,:));
+
+            end
+        end
+
+    end
+
+
+    if info.plot.bool & strcmp(info.optmode,'fmin')
+        title(info.plot.ax_plot11, ['H2 norm: ',num2str(H2_norm)]);
+
+        val_lim=H_lim/(H2_norm)*100;
+        val_point=H_point/(H2_norm)*100;
+        val_line=H_line/(H2_norm)*100;
+        
+        t_now=datetime('now')-info.plot.time_init;
+        if info.lim.bool
+            scatter(info.plot.ax_plot12,repmat(t_now,info.lim.number,1)', val_lim, 50,info.plot.colors.lim, 'filled')
+            scatter(info.plot.ax_plot13,repmat(t_now,info.lim.number,1)', H_lim, 50,info.plot.colors.lim, 'filled')
+      
+        end
+
+        if info.line.bool
+            scatter(info.plot.ax_plot12,repmat(t_now,info.line.number,1)', val_line, 50,info.plot.colors.line)
+            scatter(info.plot.ax_plot13,repmat(t_now,info.line.number,1)', H_line, 50,info.plot.colors.line)
+        end
+
+
+        if info.point.bool
+            scatter(info.plot.ax_plot12,repmat(t_now,info.point.number,1)', val_point, 50,info.plot.colors.point)
+            scatter(info.plot.ax_plot13,repmat(t_now,info.point.number,1)', H_point, 50,info.plot.colors.point)
+        end
+
+
+
+        scatter(info.plot.ax_plot13,t_now, H2_norm, 50,[0,0,0], 'filled')
+        
+        t_now=datetime('now')-info.plot.time_init;
+        if isempty(getCurrentTask)
+            
+            print(info.plot.fig_1, [info.plot.vid_dir, ...
+            'Fig1_', sprintf('%012d', round(milliseconds(t_now))), '.png'], ...
+            '-dpng', '-r150');
+        end
+    end
+
+end
+

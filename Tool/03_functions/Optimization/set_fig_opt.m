@@ -1,0 +1,70 @@
+% info.plot.fig_1=figure('Position',[100 100 1920 1080],'Color',[1,1,1]);
+info.plot.fig_1=figure('Position',[3841 -318 1536 747],'Color',[1,1,1]);
+set(info.plot.fig_1,'defaultAxesTickLabelInterpreter','latex');  
+set(info.plot.fig_1,'defaulttextinterpreter','latex');
+set(info.plot.fig_1,'defaultLegendInterpreter','latex');
+% set(info.plot.fig_1,"InnerPosition",[3841 -318 1536 747]);
+sgtitle(['Optimization Test: ',T_OPT_ii.test_name{:}])
+ax_=subplot(2,2,[1,3]);
+hold on
+set(ax_,'LineWidth',1,...
+    'Fontsize',14,....
+    'XScale','log', ...
+    'YScale','log' ...
+    );
+
+xlabel(ax_,'Frequency [Hz]')
+ylabel(ax_,'DSI')
+grid(ax_,'on')
+ax_.MinorGridColor = [1,1,1]*0.5;
+min_x=inf;
+max_x=-inf;
+
+if info.point.bool
+   min_x=min(min_x,info.point.w_opt);
+   max_x=max(max_x,info.point.w_opt);
+end
+if info.lim.bool
+   min_x=min([min_x;cellfun(@(x) min(x),info.lim.w_opt)]);
+   max_x=max([max_x;cellfun(@(x) max(x),info.lim.w_opt)]);
+end
+if info.line.bool
+   min_x=min([min_x;cellfun(@(x) min(x),info.line.w_opt)]);
+   max_x=max([max_x;cellfun(@(x) max(x),info.line.w_opt)]);
+end
+xlim(ax_,[min_x/(2*pi),max_x/(2*pi)])
+info.plot.ax_plot11=ax_;
+
+
+
+ax_=subplot(2,2,[2]);
+hold on
+title(ax_,'Participation DSI regions')
+xlabel(ax_,'Time')
+ylabel(ax_,'Percentage [$\%$]')
+grid on
+
+info.plot.ax_plot12=ax_;
+
+ax_=subplot(2,2,[4]);
+hold on
+grid on
+title(ax_,' Modify $H_{2}$ norm by DSI regions')
+xlabel(ax_,'Time')
+ylabel(ax_,'Modify $H_{2}$ norm')
+
+
+info.plot.ax_plot13=ax_;
+
+info.plot.vid_dir=[folder_results,'temp_video\'];
+mkdir(info.plot.vid_dir);
+
+info.plot.nvars=nvars;
+info.plot.colors.grid=parula(4);
+info.plot.colors.electrical=winter(6);
+info.plot.colors.all=hsv(9);
+
+
+info.plot.colors.lim=jet(info.lim.number);
+info.plot.colors.point=copper(info.point.number);
+info.plot.colors.line=winter(info.line.number);
